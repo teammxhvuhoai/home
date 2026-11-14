@@ -1,0 +1,50 @@
+name: Build iOS (IPA chưa ký)
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - name: Lấy mã nguồn
+        uses: actions/checkout@v4
+
+      - name: Cài XcodeGen
+        run: brew install xcodegen
+
+      - name: Tạo project Xcode từ project.yml
+        working-directory: iOS
+        run: xcodegen generate
+
+      - name: Build (không ký)
+        working-directory: iOS
+        run: |
+          xcodebuild \
+            -project iPhoneMonitor.xcodeproj \
+            -scheme iPhoneMonitor \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            build
+
+      - name: Đóng gói IPA
+        working-directory: iOS
+        run: |
+          mkdir -p Payload
+          cp -R build/Build/Products/Release-iphoneos/iPhoneMonitor.app Payload/
+          zip -qry iPhoneMonitor-unsigned.ipa Payload
+
+      - name: Tải IPA lên Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: iPhoneMonitor-unsigned-ipa
+          path: iOS/iPhoneMonitor-unsigned.ipa
+          if-no-files-found: error
